@@ -126,13 +126,18 @@ export function renderDetail(data, earned, settings, selectedId, onToggleEarned)
   const missLine = t.missable && t.missableNote
     ? '<p class="miss-note"><strong>⚠ Missable:</strong> ' + esc(t.missableNote) + '</p>'
     : '';
+  // When the spoiler setting masks this trophy, hide the guide too — the guide
+  // names story missions, so showing it would spoil the story the setting hides.
+  const guideHtml = masked
+    ? '<p><span class="hidden-note">Hidden until earned — turn the spoiler setting off to reveal it.</span></p>'
+    : '<p>' + esc(t.guide) + '</p>';
   pane.innerHTML = '<div class="detail-card">' +
     '<h2>' + (masked ? 'Hidden story trophy' : esc(t.name)) + '</h2>' +
     '<p class="detail-desc">' + (masked ? 'Its name and description stay hidden until you earn it — the spoiler setting is on.' : '“' + esc(t.description) + '”') + '</p>' +
     '<div class="detail-meta">' + gradeTag(t) + kindTag(t) +
     '<span class="kind-tag">Roadmap stage ' + t.stage + '</span></div>' +
     countLine + missLine +
-    '<div class="detail-guide"><h3>Guide</h3><p>' + esc(t.guide) + '</p></div>' +
+    '<div class="detail-guide"><h3>Guide</h3>' + guideHtml + '</div>' +
     '<div class="detail-sources"><h3>Sources</h3><ul>' + sourceLinks +
     '<li>Guide: this entry’s own advice, written from the official description — not yet checked in the game.</li></ul>' +
     '<p>Names, descriptions and grades are PlayStation’s official list; the guide never copies another guide’s text.</p></div>' +
