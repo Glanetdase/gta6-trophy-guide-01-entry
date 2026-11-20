@@ -4,84 +4,57 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Leonida Ledger — GTA 6 Trophy Guide &amp; Tracker</title>
-<meta name="description" content="An offline guide and tracker for all 55 PlayStation 5 trophies of Grand Theft Auto VI: the official list, saved progress, filters, a spoiler setting, a roadmap to the platinum, and a cited guide for every trophy.">
+<meta name="description" content="An offline guide and tracker for all 55 Grand Theft Auto VI trophies: checklist, platinum roadmap, missable flags and cited guides.">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header class="topbar">
-  <div class="brand">
-    <span class="brand-mark" aria-hidden="true">LL</span>
-    <div>
-      <h1>Leonida Ledger</h1>
-      <p class="subtitle">GTA 6 Trophy Guide &amp; Tracker · PlayStation 5 · works offline</p>
+<header class="masthead">
+  <div class="masthead-inner">
+    <p class="kicker">Grand Theft Auto VI · PlayStation 5 · 55 trophies</p>
+    <h1>Leonida Ledger</h1>
+    <p class="tagline">Every trophy, its guide and its sources — with a checklist that remembers where you are.</p>
+    <div class="progress" role="progressbar" aria-label="Trophies earned">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
     </div>
-  </div>
-  <div class="progress-wrap" id="progress-wrap">
-    <div class="progress-line"><span id="progress-count">0 / 55</span><span id="progress-pct">0%</span></div>
-    <div class="progress-bar" role="progressbar" aria-label="Trophies earned" aria-valuemin="0" aria-valuemax="55" aria-valuenow="0"><span id="progress-fill"></span></div>
-    <div class="progress-grades" id="progress-grades"></div>
+    <p class="progress-text" id="progress-text">0 / 55 trophies · 0%</p>
   </div>
 </header>
-
 <nav class="tabs" aria-label="Guide sections">
-  <button class="tab active" data-view="checklist" type="button">Checklist</button>
-  <button class="tab" data-view="roadmap" type="button">Roadmap to Platinum</button>
-  <button class="tab" data-view="missables" type="button">Missables <span class="tab-badge" id="missable-count">4</span></button>
-  <button class="tab" data-view="settings" type="button">Settings &amp; Sources</button>
+  <button type="button" data-tab="checklist" class="active">Checklist</button>
+  <button type="button" data-tab="roadmap">Platinum roadmap</button>
+  <button type="button" data-tab="missables">Missables</button>
+  <button type="button" data-tab="settings">Settings &amp; sources</button>
 </nav>
-
-<main>
-  <section id="view-checklist" class="view active" aria-label="Trophy checklist">
-    <div class="checklist-layout">
-      <div class="list-col">
-        <div class="toolbar">
-          <label class="search-box"><span class="visually-hidden">Search trophies</span><input id="search" type="search" placeholder="Search name or description…" autocomplete="off"></label>
-          <div class="chip-row" id="kind-chips" role="group" aria-label="Filter by kind">
-            <button class="chip active" data-kind="all" type="button">All <span class="chip-n" data-n="all"></span></button>
-            <button class="chip" data-kind="story" type="button">Story <span class="chip-n" data-n="story"></span></button>
-            <button class="chip" data-kind="missable" type="button">Missable <span class="chip-n" data-n="missable"></span></button>
-            <button class="chip" data-kind="collectibles" type="button">Collectibles <span class="chip-n" data-n="collectibles"></span></button>
-            <button class="chip" data-kind="activities" type="button">Activities <span class="chip-n" data-n="activities"></span></button>
-            <button class="chip" data-kind="online" type="button">Online <span class="chip-n" data-n="online"></span></button>
-          </div>
-          <div class="chip-row" id="grade-chips" role="group" aria-label="Filter by grade">
-            <button class="chip small active" data-grade="all" type="button">Any grade</button>
-            <button class="chip small" data-grade="platinum" type="button">Platinum</button>
-            <button class="chip small" data-grade="gold" type="button">Gold</button>
-            <button class="chip small" data-grade="silver" type="button">Silver</button>
-            <button class="chip small" data-grade="bronze" type="button">Bronze</button>
-          </div>
-          <div class="chip-row" id="state-chips" role="group" aria-label="Filter by earned state">
-            <button class="chip small active" data-state="all" type="button">All trophies</button>
-            <button class="chip small" data-state="earned" type="button">Earned</button>
-            <button class="chip small" data-state="remaining" type="button">Still to earn</button>
-          </div>
-          <label class="spoiler-toggle"><input id="spoiler" type="checkbox"> <span>Hide story trophies until earned <em>(spoiler-free)</em></span></label>
-        </div>
-        <p class="list-note" id="list-note"></p>
-        <ul class="trophy-list" id="trophy-list"></ul>
-      </div>
-      <aside class="detail-col" id="detail-col" aria-label="Selected trophy guide"></aside>
-    </div>
-  </section>
-
-  <section id="view-roadmap" class="view" aria-label="Roadmap to the platinum">
-    <div class="page-col" id="roadmap-col"></div>
-  </section>
-
-  <section id="view-missables" class="view" aria-label="Missable trophies">
-    <div class="page-col" id="missables-col"></div>
-  </section>
-
-  <section id="view-settings" class="view" aria-label="Settings and sources">
-    <div class="page-col" id="settings-col"></div>
-  </section>
+<div class="toolbar" id="toolbar">
+  <input type="search" id="search" placeholder="Search trophies…" aria-label="Search trophies">
+  <select id="kind-filter" aria-label="Filter by kind">
+    <option value="all">All kinds</option>
+    <option value="story">Story</option>
+    <option value="missable">Missable</option>
+    <option value="collectibles">Collectibles</option>
+    <option value="activities">Activities</option>
+    <option value="online">Online</option>
+  </select>
+  <select id="grade-filter" aria-label="Filter by grade">
+    <option value="all">All grades</option>
+    <option value="platinum">Platinum</option>
+    <option value="gold">Gold</option>
+    <option value="silver">Silver</option>
+    <option value="bronze">Bronze</option>
+  </select>
+  <select id="status-filter" aria-label="Filter by earned status">
+    <option value="all">Earned + remaining</option>
+    <option value="earned">Earned only</option>
+    <option value="remaining">Remaining only</option>
+  </select>
+</div>
+<main class="layout">
+  <section id="view" aria-live="polite"></section>
+  <aside id="detail" aria-label="Trophy guide"></aside>
 </main>
-
-<footer>
-  <p>Leonida Ledger — an independent, open-source fan guide. Not affiliated with Rockstar Games, Take-Two Interactive or PlayStation. Trophy names, descriptions and grades are PlayStation's official list; guides are this entry's own words. No network requests: everything on this page comes from its own files.</p>
+<footer class="colophon">
+  <p>Leonida Ledger — an unofficial fan guide. Grand Theft Auto and GTA are trademarks of Rockstar Games; this guide is not affiliated with or endorsed by Rockstar. Trophy names, descriptions and grades are as PlayStation publishes them; guides are written for this entry, with sources cited beside each trophy.</p>
 </footer>
-
 <script type="module" src="js/main.js"></script>
 </body>
 </html>

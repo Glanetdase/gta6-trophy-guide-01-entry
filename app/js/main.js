@@ -1,143 +1,210 @@
-// main.js — boots the Leonida Ledger: loads the trophy data, wires the tabs,
-// the filters, the spoiler setting, the checklist, the detail pane, the roadmap,
-// the missables page and the settings page. All state lives in localStorage.
-import { loadTrophies } from './data.js';
-import { exportProgress, importProgress, loadProgress, loadSettings, resetAll, saveProgress, saveSettings } from './store.js';
-import { FILTER_STATE } from './filters.js';
-import { renderChecklist, renderChipCounts, renderDetail, renderMissables, renderProgress, renderRoadmap, renderSettings } from './views.js';
+// Leonida Ledger — bootstrap.
+// Loads the trophy file, restores saved progress, renders the active view
+// and wires every control. The app is fully offline: the only fetch is the
+// trophy JSON from its own folder, and no request leaves the browser.
+
+import { loadTrophyFile, trophyById } from './data.js';
+import {
+  loadState,
+  saveState,
+  toggleEarned,
+  earnedCount,
+  resetProgress,
+  exportText,
+  parseImport,
+} from './store.js';
+import { applyFilters, isMasked } from './filters.js';
+import {
+  renderChecklist,
+  renderDetail,
+  renderRoadmap,
+  renderMissables,
+  renderSettings,
+} from './views.js';
+
+const $ = (sel, root = document) => root.querySelector(sel);
 
 const state = {
-  data: null,
-  earned: loadProgress(),
-  settings: loadSettings(),
-  selectedId: null,
+  trophies: [],
+  sources: [],
+  meta: {},
+  store: loadState(),
   view: 'checklist',
+  selectedId: null,
+  filters: { q: '', kind: 'all', grade: 'all', status: 'all' },
 };
 
-/** Re-render the current view and the header progress. */
+function earnedSet() {
+  return new Set(state.store.earned);
+}
+
+function visibleRows() {
+  const set = earnedSet();
+  const list = applyFilters(state.trophies, { ...state.filters, earnedSet: set });
+  return list.map((t) => ({
+    trophy: t,
+    earned: set.has(t.id),
+    masked: isMasked(t, state.store.spoiler, set),
+  }));
+}
+
+function sourceByKey() {
+  const out = {};
+  for (const s of state.sources) out[s.key] = s;
+  return out;
+}
+
 function renderAll() {
-  const { data, earned, settings } = state;
-  renderProgress(data, earned);
-  renderChipCounts(data);
+  const set = earnedSet();
+  const done = earnedCount(state.store, state.trophies);
+  const pct = state.trophies.length ? Math.round((100 * done) / state.trophies.length) : 0;
+  $('#progress-fill').style.width = pct + '%';
+  $('#progress-text').textContent = done + ' / ' + state.trophies.length + ' trophies · ' + pct + '%';
+  document.querySelectorAll('[data-tab]').forEach((b) =>
+    b.classList.toggle('active', b.dataset.tab === state.view),
+  );
+  const view = $('#view');
+  const detail = $('#detail');
+  const toolbar = $('#toolbar');
+  toolbar.style.display = state.view === 'checklist' ? '' : 'none';
+  detail.style.display = state.view === 'checklist' ? '' : 'none';
   if (state.view === 'checklist') {
-    renderChecklist(data, earned, settings, state.selectedId, selectTrophy);
-    renderDetail(data, earned, settings, state.selectedId, toggleEarned);
+    renderChecklist(view, visibleRows(), state);
+    const sel = state.selectedId ? trophyById(state.trophies, state.selectedId) : null;
+    renderDetail(
+      detail,
+      sel,
+      sel ? set.has(sel.id) : false,
+      sel ? isMasked(sel, state.store.spoiler, set) : false,
+      sourceByKey(),
+    );
   } else if (state.view === 'roadmap') {
-    renderRoadmap(data, earned, selectTrophy);
+    renderRoadmap(view, state.trophies, set);
   } else if (state.view === 'missables') {
-    renderMissables(data, earned, selectTrophy);
-  } else if (state.view === 'settings') {
-    renderSettings(data, settings, {
-      earnedCount: () => state.earned.size,
-      onToggleSpoiler: () => {
-        state.settings.spoiler = !state.settings.spoiler;
-        saveSettings(state.settings);
-        syncSpoilerBox();
-        renderAll();
-      },
-      onExport: () => exportProgress(state.earned),
-      onImport: async (file) => {
-        const msg = document.getElementById('settings-msg');
-        if (!file) return;
-        try {
-          const imported = await importProgress(file);
-          const valid = new Set([...imported].filter((id) => state.data.trophies.some((t) => t.id === id)));
-          state.earned = valid;
-          saveProgress(state.earned);
-          renderAll();
-          const after = document.getElementById('settings-msg');
-          if (after) after.textContent = 'Imported ' + valid.size + ' earned trophies.';
-        } catch (err) {
-          if (msg) msg.textContent = err.message;
-        }
-      },
-      onReset: () => {
-        if (!window.confirm('Reset all progress and settings? This cannot be undone.')) return;
-        resetAll();
-        state.earned = new Set();
-        state.settings = { spoiler: false };
-        state.selectedId = null;
-        syncSpoilerBox();
-        renderAll();
-      },
-    });
+    renderMissables(view, state.trophies, set);
+  } else {
+    renderSettings(view, state.store, state.sources, done);
   }
+  if (!window.__shotReady) window.__shotReady = true;
 }
 
-/** Switch tabs and re-render. */
-function switchView(view) {
-  state.view = view;
-  document.querySelectorAll('.tab').forEach((tab) => {
-    tab.classList.toggle('active', tab.dataset.view === view);
-  });
-  document.querySelectorAll('.view').forEach((section) => {
-    section.classList.toggle('active', section.id === 'view-' + view);
-  });
-  renderAll();
-}
-
-/** Select a trophy (from the checklist, roadmap or missables) and open its guide. */
-function selectTrophy(id) {
-  state.selectedId = id;
-  if (state.view !== 'checklist') switchView('checklist');
-  else renderAll();
-  const pane = document.getElementById('detail-col');
-  if (pane && window.innerWidth <= 900) pane.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-/** Toggle a trophy's earned state and save it. */
-function toggleEarned(id) {
-  if (state.earned.has(id)) state.earned.delete(id);
-  else state.earned.add(id);
-  saveProgress(state.earned);
-  renderAll();
-}
-
-/** Keep the toolbar spoiler checkbox in sync with settings. */
-function syncSpoilerBox() {
-  const box = document.getElementById('spoiler');
-  if (box) box.checked = state.settings.spoiler;
-}
-
-/** Wire the toolbar: search, kind/grade/state chips, spoiler checkbox. */
-function wireToolbar() {
-  const search = document.getElementById('search');
-  search.addEventListener('input', () => {
-    FILTER_STATE.search = search.value.trim();
+function wireEvents() {
+  document.querySelectorAll('[data-tab]').forEach((b) =>
+    b.addEventListener('click', () => {
+      state.view = b.dataset.tab;
+      renderAll();
+    }),
+  );
+  $('#search').addEventListener('input', (e) => {
+    state.filters.q = e.target.value;
     renderAll();
   });
-  const wireChips = (selector, key) => {
-    document.querySelectorAll(selector).forEach((chip) => {
-      chip.addEventListener('click', () => {
-        FILTER_STATE[key] = chip.dataset[key];
-        document.querySelectorAll(selector).forEach((c) => c.classList.toggle('active', c === chip));
+  $('#kind-filter').addEventListener('change', (e) => {
+    state.filters.kind = e.target.value;
+    renderAll();
+  });
+  $('#grade-filter').addEventListener('change', (e) => {
+    state.filters.grade = e.target.value;
+    renderAll();
+  });
+  $('#status-filter').addEventListener('change', (e) => {
+    state.filters.status = e.target.value;
+    renderAll();
+  });
+  // Event delegation: checkbox toggles and row selection, everywhere.
+  document.addEventListener('change', (e) => {
+    const check = e.target.closest('[data-check]');
+    if (check) {
+      toggleEarned(state.store, check.dataset.check);
+      renderAll();
+      return;
+    }
+    if (e.target.id === 'spoiler-toggle') {
+      state.store.spoiler = e.target.checked;
+      saveState(state.store);
+      renderAll();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    const row = e.target.closest('[data-id]');
+    if (row && !e.target.closest('[data-check]') && !e.target.closest('label')) {
+      state.selectedId = row.dataset.id;
+      if (state.view !== 'checklist') state.view = 'checklist';
+      renderAll();
+      return;
+    }
+    if (e.target.id === 'export-btn') {
+      const blob = new Blob([exportText(state.store)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'leonida-ledger-progress.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    if (e.target.id === 'reset-btn') {
+      if (window.confirm('Reset all progress? This clears every earned tick.')) {
+        resetProgress(state.store);
+        state.selectedId = null;
+        renderAll();
+      }
+    }
+  });
+  document.addEventListener('change', (e) => {
+    if (e.target.id === 'import-file' && e.target.files.length) {
+      const file = e.target.files[0];
+      file.text().then((text) => {
+        try {
+          const ids = parseImport(text);
+          const known = new Set(state.trophies.map((t) => t.id));
+          state.store.earned = ids.filter((id) => known.has(id));
+          saveState(state.store);
+          $('#import-note').textContent = 'Imported ' + state.store.earned.length + ' earned trophies.';
+        } catch {
+          $('#import-note').textContent = 'That file could not be read as progress.';
+        }
         renderAll();
       });
-    });
-  };
-  wireChips('#kind-chips .chip', 'kind');
-  wireChips('#grade-chips .chip', 'grade');
-  wireChips('#state-chips .chip', 'state');
-  document.getElementById('spoiler').addEventListener('change', (e) => {
-    state.settings.spoiler = e.target.checked;
-    saveSettings(state.settings);
-    renderAll();
+    }
   });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && e.target.matches('[data-id]')) {
+      state.selectedId = e.target.dataset.id;
+      renderAll();
+    }
+  });
+}
+
+/** Screenshot staging: ?shot=checklist|roadmap|missables|spoiler. */
+function applyShotParam() {
+  const shot = new URLSearchParams(location.search).get('shot');
+  if (!shot) return;
+  if (shot === 'roadmap' || shot === 'missables') state.view = shot;
+  if (shot === 'spoiler') {
+    state.view = 'checklist';
+    state.store.spoiler = true;
+    saveState(state.store);
+    // Open the masked platinum in the detail panel so the shot shows the
+    // spoiler mask on both the list and the guide panel.
+    state.selectedId = 'vice-got-a-price';
+  }
+  if (shot === 'checklist') {
+    state.view = 'checklist';
+    state.selectedId = 'cunning-stunts';
+  }
 }
 
 async function boot() {
   try {
-    state.data = await loadTrophies();
+    const doc = await loadTrophyFile();
+    state.trophies = doc.trophies;
+    state.sources = doc.sources;
+    state.meta = doc.meta;
   } catch (err) {
-    document.getElementById('trophy-list').innerHTML =
-      '<li class="empty-list">Could not load the trophy list: ' + err.message + '</li>';
+    $('#view').innerHTML = '<p class="empty">The trophy list could not be loaded. ' + err.message + '</p>';
     return;
   }
-  document.querySelectorAll('.tab').forEach((tab) => {
-    tab.addEventListener('click', () => switchView(tab.dataset.view));
-  });
-  wireToolbar();
-  syncSpoilerBox();
+  applyShotParam();
+  wireEvents();
   renderAll();
 }
 

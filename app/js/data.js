@@ -1,8 +1,20 @@
-// data.js — loads the trophy list (app/data/trophies.json) and exposes it with helpers.
-// The file is fetched from this app's own server at run time; nothing is fetched from the network.
+// Leonida Ledger — data layer.
+// Loads the official trophy list and offers small lookups over it. The JSON
+// itself is the source of truth; this module only reads it and derives the
+// shapes the views need (grouped by grade, by roadmap stage, by kind).
+
+const DATA_URL = 'data/trophies.json';
+
 export const GRADE_ORDER = ['platinum', 'gold', 'silver', 'bronze'];
 
-export const KIND_LABELS = {
+export const GRADE_LABEL = {
+  platinum: 'Platinum',
+  gold: 'Gold',
+  silver: 'Silver',
+  bronze: 'Bronze',
+};
+
+export const KIND_LABEL = {
   story: 'Story',
   missable: 'Missable',
   collectibles: 'Collectibles',
@@ -11,48 +23,43 @@ export const KIND_LABELS = {
   platinum: 'Platinum',
 };
 
-export const GRADE_LABELS = {
-  platinum: 'Platinum',
-  gold: 'Gold',
-  silver: 'Silver',
-  bronze: 'Bronze',
-};
+export const ROADMAP_STAGES = [
+  { n: 1, title: 'Stage 1 — Play the story', blurb: 'Chapters 1–4 and the finale, in order. Every chapter and story mission trophy lands here.' },
+  { n: 2, title: 'Stage 2 — Strangers & activities', blurb: 'Stranger mission strands, then the activity list: ranges, races, fishing, robberies and the one-time events. Do the missables here, while the story is fresh.' },
+  { n: 3, title: 'Stage 3 — Collectibles & counts', blurb: 'Stunts, cards, WAiNK spots, meditation, vehicles and exploration. Slow, steady counting — best done with the map open.' },
+  { n: 4, title: 'Stage 4 — Cleanup & platinum', blurb: 'Money trophies, 100% completion, then the platinum pops on its own.' },
+];
 
-let cache = null;
-
-/** Load the trophy data once; returns { meta, sources, trophies }. */
-export async function loadTrophies() {
-  if (cache) return cache;
-  const res = await fetch('data/trophies.json');
-  if (!res.ok) throw new Error('Could not load data/trophies.json (' + res.status + ')');
-  const data = await res.json();
-  cache = data;
-  return data;
+/** Fetch app/data/trophies.json and return { meta, sources, trophies }. */
+export async function loadTrophyFile() {
+  const res = await fetch(DATA_URL);
+  if (!res.ok) throw new Error('could not load ' + DATA_URL);
+  const doc = await res.json();
+  const trophies = Array.isArray(doc) ? doc : doc.trophies;
+  const meta = Array.isArray(doc) ? {} : doc.meta || {};
+  const sources = Array.isArray(doc) ? [] : doc.sources || [];
+  return { meta, sources, trophies };
 }
 
-/** Find a trophy by its numeric id. */
-export function trophyById(data, id) {
-  return data.trophies.find((t) => t.id === id) || null;
+export function trophyById(trophies, id) {
+  return trophies.find((t) => t.id === id) || null;
 }
 
-/** Count earned trophies per grade. */
-export function gradeCounts(data, earned) {
-  const counts = {};
-  for (const g of GRADE_ORDER) {
-    counts[g] = {
-      total: data.trophies.filter((t) => t.grade === g).length,
-      earned: data.trophies.filter((t) => t.grade === g && earned.has(t.id)).length,
-    };
-  }
-  return counts;
+export function countByGrade(trophies) {
+  const out = { platinum: 0, gold: 0, silver: 0, bronze: 0 };
+  for (const t of trophies) if (t.grade in out) out[t.grade] += 1;
+  return out;
 }
 
-/** The four missable trophies, in list order. */
-export function missableTrophies(data) {
-  return data.trophies.filter((t) => t.missable);
+export function missableTrophies(trophies) {
+  return trophies.filter((t) => t.missable);
 }
 
-/** Trophies of one roadmap stage, in list order. */
-export function stageTrophies(data, stage) {
-  return data.trophies.filter((t) => t.stage === stage);
+export function trophiesInStage(trophies, stage) {
+  return trophies.filter((t) => t.stage === stage);
+}
+
+/** A trophy counts as a story trophy for the spoiler mask. */
+export function isStoryTrophy(t) {
+  return t.kind === 'story' || t.grade === 'platinum';
 }
